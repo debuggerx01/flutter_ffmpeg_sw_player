@@ -60,7 +60,7 @@ FfmpegUtil.setBinaryPath('/path/to/your/ffmpeg');
 ### 基础用法
 
 ```dart
-import 'package:flutter_ffmpeg_sw_player/flutter_ffmpeg_sw_player.dart\\';
+import 'package:flutter_ffmpeg_sw_player/flutter_ffmpeg_sw_player.dart';
 
 // 1. 创建控制器
 final controller = FfmpegPlayerController();
