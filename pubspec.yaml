@@ -1,6 +1,6 @@
 name: flutter_ffmpeg_sw_player
 description: "一个基于 FFmpeg 管道输出的 Flutter 视频软渲染插件，专为解决 Linux 平台下视频播放的稳定性与依赖痛点而设计。"
-version: 0.0.2
+version: 0.0.3
 repository: https://github.com/debuggerx01/flutter_ffmpeg_sw_player
 
 environment:
