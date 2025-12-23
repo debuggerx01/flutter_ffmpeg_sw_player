@@ -46,7 +46,9 @@ FfmpegUtil.setBinaryPath('/path/to/your/ffmpeg');
 > 经测试，ffmpeg v6.1版本在二进制文件尺寸和性能方面表现出色，建议从如下地址下载静态编译的版本：[FFmpeg-Builds -- Auto-Build 2025-08-31](https://github.com/BtbN/FFmpeg-Builds/releases/tag/autobuild-2025-08-31-13-00)
 > 
 > x64: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2025-08-31-13-00/ffmpeg-n6.1.3-linux64-lgpl-6.1.tar.xz
+> 
 > arm64: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2025-08-31-13-00/ffmpeg-n6.1.3-linuxarm64-lgpl-6.1.tar.xz
+> 
 > 下载后解压获取 `bin/ffmpeg`，可以考虑将其放在项目的assets中，应用启动时将其提取释放到用户目录，通过`Process.runSync('chmod', ['u+x', '/path/to/your/ffmpeg']);`赋予执行权限，最后将该路径传递给`FfmpegUtil.setBinaryPath`即可。
 
 ### 2. 添加依赖
@@ -105,4 +107,4 @@ void dispose() {
 
 ---
 
-注意：本插件主要针对 Linux 平台开发测试。
+注意：本插件主要针对 Linux 平台开发测试，windows和mac理论上也支持，请自行测试。
