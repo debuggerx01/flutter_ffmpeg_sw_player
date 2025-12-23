@@ -27,6 +27,7 @@ class _FfmpegPlayerViewState extends State<FfmpegPlayerView> {
   int? _textureId;
   int? _texturePtr;
   ui.Image? frameImage;
+  ui.Size size = ui.Size.zero;
 
   @override
   void initState() {
@@ -39,27 +40,40 @@ class _FfmpegPlayerViewState extends State<FfmpegPlayerView> {
         if (textureId != -1) {
           _textureRgbaRendererPlugin.getTexturePtr(_key).then(
             (ptr) {
-              setState(() {
-                _texturePtr = ptr;
-              });
+              if (mounted) {
+                setState(() {
+                  _texturePtr = ptr;
+                });
+              }
             },
           );
-          setState(() {
-            _textureId = textureId;
-          });
+          if (mounted) {
+            setState(() {
+              _textureId = textureId;
+            });
+          }
           widget.controller.setOnFrame(
             (
               dataPtr,
               width,
               height,
-            ) => Native.instance.onRgba(
-              Pointer.fromAddress(_texturePtr!).cast<Void>(),
-              dataPtr,
-              width * height * 4,
-              width,
-              height,
-              1,
-            ),
+            ) {
+              if (size.width != width.toDouble() || size.height != height.toDouble()) {
+                if (mounted) {
+                  setState(() {
+                    size = ui.Size(width.toDouble(), height.toDouble());
+                  });
+                }
+              }
+              Native.instance.onRgba(
+                Pointer.fromAddress(_texturePtr!).cast<Void>(),
+                dataPtr,
+                width * height * 4,
+                width,
+                height,
+                1,
+              );
+            },
           );
         }
       });
@@ -72,9 +86,11 @@ class _FfmpegPlayerViewState extends State<FfmpegPlayerView> {
             height,
             ui.PixelFormat.bgra8888,
             (result) {
-              setState(() {
-                frameImage = result;
-              });
+              if (mounted) {
+                setState(() {
+                  frameImage = result;
+                });
+              }
             },
           );
         },
@@ -100,12 +116,15 @@ class _FfmpegPlayerViewState extends State<FfmpegPlayerView> {
       );
     }
     return _textureId == null
-        ? SizedBox()
+        ? const SizedBox.shrink()
         : FittedBox(
             fit: widget.fit,
-            child: Texture(
-              textureId: _textureId!,
-              filterQuality: FilterQuality.none,
+            child: SizedBox.fromSize(
+              size: size,
+              child: Texture(
+                textureId: _textureId!,
+                filterQuality: FilterQuality.none,
+              ),
             ),
           );
   }
