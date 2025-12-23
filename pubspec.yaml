@@ -1,7 +1,7 @@
 name: flutter_ffmpeg_sw_player
 description: "A new Flutter project."
 version: 0.0.1
-homepage:
+repository: https://github.com/debuggerx01/flutter_ffmpeg_sw_player
 
 environment:
   sdk: ^3.10.0
