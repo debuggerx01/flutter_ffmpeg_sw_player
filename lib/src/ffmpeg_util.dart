@@ -90,6 +90,9 @@ class FfmpegUtil {
 extension DurationExt on String {
   Duration get toDuration {
     var parts = split(':');
+    if (parts.length != 3) {
+      return Duration.zero;
+    }
     return Duration(
       hours: int.parse(parts[0]),
       minutes: int.parse(parts[1]),

@@ -18,27 +18,25 @@ class _SinglePlayerPageState extends State<SinglePlayerPage> {
   @override
   void initState() {
     super.initState();
-    playerController
-        .play(
-          'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
-          onProgress: (pos) {
-            if (mounted) {
-              setState(() {
-                this.pos = pos;
-              });
-            }
-          },
-        )
-        .then(
-          (value) {
-            if (mounted) {
-              setState(() {
-                mediaInfo = value;
-                startTime = DateTime.now();
-              });
-            }
-          },
-        );
+    playerController.play(
+      'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
+      onProgress: (pos) {
+        if (mounted) {
+          setState(() {
+            this.pos = pos;
+          });
+        }
+      },
+    ).then(
+      (value) {
+        if (mounted) {
+          setState(() {
+            mediaInfo = value;
+            startTime = DateTime.now();
+          });
+        }
+      },
+    );
   }
 
   @override
@@ -77,27 +75,33 @@ class _SinglePlayerPageState extends State<SinglePlayerPage> {
                 Formats.fileUri,
                 (uri) {
                   if (uri != null) {
-                    playerController
-                        .play(
-                          uri.toFilePath(),
-                          onProgress: (pos) {
-                            if (mounted) {
-                              setState(() {
-                                this.pos = pos;
-                              });
-                            }
-                          },
-                        )
-                        .then(
-                          (value) {
-                            if (mounted) {
-                              setState(() {
-                                mediaInfo = value;
-                                startTime = DateTime.now();
-                              });
-                            }
-                          },
-                        );
+                    playerController.play(
+                      uri.toFilePath(),
+                      onProgress: (pos) {
+                        if (mounted) {
+                          setState(() {
+                            this.pos = pos;
+                          });
+                        }
+                      },
+                    ).then(
+                      (value) {
+                        if (mounted && context.mounted) {
+                          if (value == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('加载失败'),
+                              ),
+                            );
+                          } else {
+                            setState(() {
+                              mediaInfo = value;
+                              startTime = DateTime.now();
+                            });
+                          }
+                        }
+                      },
+                    );
                   }
                 },
               );

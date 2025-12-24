@@ -103,7 +103,15 @@ class FfmpegPlayerController {
             } else {
               _nativeBuffer = malloc.allocate(_currentBufferSize);
             }
-            completer.complete(_mediaInfo);
+            if (!completer.isCompleted) {
+              completer.complete(_mediaInfo);
+            }
+          } else if (line.startsWith('Error opening input')) {
+            status.value = PlayerStatus.error;
+            stop();
+            if (!completer.isCompleted) {
+              completer.complete(null);
+            }
           }
         }
         if (onProgress != null && line.startsWith('out_time=') && !line.endsWith('N/A')) {
