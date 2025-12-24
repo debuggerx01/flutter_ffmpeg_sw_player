@@ -49,7 +49,7 @@ FfmpegUtil.setBinaryPath('/path/to/your/ffmpeg');
 > 
 > arm64: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2025-08-31-13-00/ffmpeg-n6.1.3-linuxarm64-lgpl-6.1.tar.xz
 > 
-> 下载后解压获取 `bin/ffmpeg`，可以考虑将其放在项目的assets中，应用启动时将其提取释放到用户目录，通过`Process.runSync('chmod', ['u+x', '/path/to/your/ffmpeg']);`赋予执行权限，最后将该路径传递给`FfmpegUtil.setBinaryPath`即可。
+> 下载后解压获取 `bin/ffmpeg`，可以考虑将其放在项目的assets中，应用启动时通过调用 `FfmpegUtil.setupFromAsset` 方法自动处理。
 
 ### 2. 添加依赖
 
@@ -93,13 +93,13 @@ void dispose() {
 
 ## 🎮 控制器 API
 
-| 方法/属性                               | 说明                                                                           |
-|:------------------------------------|:-----------------------------------------------------------------------------|
-| play(path, {loop, onProgress, ...}) | 开始播放视频文件或网络流                                                                 |
-| stop()                              | 停止播放并重置状态                                                                    |
-| togglePlay()                        | 切换 暂停/播放 状态                                                                  |
-| status                              | ValueNotifier<PlayerStatus> 监听播放器状态 (idle, loading, playing, pausing, error) |
-| dispose()                           | 释放资源，关闭 FFmpeg 进程                                                            |
+| 方法/属性                               | 说明                                                                             |
+|:------------------------------------|:-------------------------------------------------------------------------------|
+| play(path, {loop, onProgress, ...}) | 开始播放视频文件或网络流，可以通过返回值是否为null判断视频解析是否发生异常                                        |
+| stop()                              | 停止播放并重置状态                                                                      |
+| togglePlay()                        | 切换 暂停/播放 状态                                                                    |
+| status                              | ValueNotifier\<PlayerStatus\> 监听播放器状态 (idle, loading, playing, pausing, error) |
+| dispose()                           | 释放资源，关闭 FFmpeg 进程                                                              |
 
 ## 🤝 贡献与反馈
 
@@ -107,4 +107,4 @@ void dispose() {
 
 ---
 
-注意：本插件主要针对 Linux 平台开发测试，windows和mac理论上也支持，请自行测试。
+注意：本插件主要针对 Linux 平台开发测试，windows和mac理论上也支持，请自行修改测试。

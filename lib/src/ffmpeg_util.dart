@@ -2,13 +2,42 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+
 import 'media_info.dart';
 
 String? _ffmpegBinaryPath;
 
 class FfmpegUtil {
-  static void setBinaryPath(String path) {
+  static Future setupFromAsset(String assetsKey, [bool forceUpdate = false]) async {
+    var directory = await getApplicationSupportDirectory();
+    _ffmpegBinaryPath = '${directory.path}/3rd_party/ffmpeg';
+    var ffmpegBinaryFile = File(_ffmpegBinaryPath!);
+    if (ffmpegBinaryFile.existsSync() && !forceUpdate) {
+      return;
+    }
+    rootBundle.load(assetsKey).then((data) async {
+      if (!ffmpegBinaryFile.existsSync()) {
+        ffmpegBinaryFile.createSync(recursive: true);
+        ffmpegBinaryFile.writeAsBytesSync(data.buffer.asUint8List());
+        setBinaryPath(ffmpegBinaryFile.path);
+      }
+    });
+  }
+
+  static bool setBinaryPath(String path) {
+    var file = File(path);
+    if (!file.existsSync()) return false;
+
     _ffmpegBinaryPath = path;
+    var stat = file.statSync();
+    if (Platform.isLinux) {
+      if (stat.mode & 0x40 == 0) {
+        Process.runSync('chmod', ['u+x', _ffmpegBinaryPath!]);
+      }
+    }
+    return true;
   }
 
   static MediaInfo? fetchMediaInfoFromLogs(List<String> logs) {

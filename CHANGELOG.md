@@ -13,3 +13,7 @@
 ## 0.0.4
 
 * 完善异常处理，现在可以播放视频和图片，其他情况则返回MediaInfo为空
+
+## 0.0.5
+
+* 增加FfmpegUtil.setupFromAsset方法
