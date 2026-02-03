@@ -14,7 +14,7 @@ enum PlayerStatus {
   idle,
   loading,
   playing,
-  pausing,
+  paused,
   error,
 }
 
@@ -70,7 +70,6 @@ class FfmpegPlayerController {
     required bool fromLoop,
     required bool loop,
   }) {
-    status.value = PlayerStatus.loading;
     Completer<MediaInfo?> completer = Completer();
     var logs = <String>[];
     if (fromLoop) {
@@ -78,6 +77,7 @@ class FfmpegPlayerController {
     } else {
       stop();
     }
+    status.value = PlayerStatus.loading;
     _reachEnd = false;
     FfmpegUtil.playFile(
       path,
@@ -98,8 +98,7 @@ class FfmpegPlayerController {
           if (line.startsWith('Output #0, rawvideo,')) {
             _mediaInfo = FfmpegUtil.fetchMediaInfoFromLogs(logs);
             if (_mediaInfo == null) {
-              status.value = PlayerStatus.error;
-              stop();
+              stop(true);
             } else {
               _nativeBuffer = malloc.allocate(_currentBufferSize);
             }
@@ -107,8 +106,7 @@ class FfmpegPlayerController {
               completer.complete(_mediaInfo);
             }
           } else if (line.startsWith('Error opening input')) {
-            status.value = PlayerStatus.error;
-            stop();
+            stop(true);
             if (!completer.isCompleted) {
               completer.complete(null);
             }
@@ -234,7 +232,8 @@ class FfmpegPlayerController {
     );
   }
 
-  void stop() {
+  void stop([bool error = false]) {
+    status.value = error ? PlayerStatus.error : PlayerStatus.idle;
     dispose();
     _mediaInfo = null;
     _chunkQueue.clear();
@@ -263,8 +262,8 @@ class FfmpegPlayerController {
   void togglePlay() {
     if (status.value == PlayerStatus.playing) {
       _fpsTicker.pause();
-      status.value = PlayerStatus.pausing;
-    } else if (status.value == PlayerStatus.pausing) {
+      status.value = PlayerStatus.paused;
+    } else if (status.value == PlayerStatus.paused) {
       _fpsTicker.resume();
       status.value = PlayerStatus.playing;
     }

@@ -17,3 +17,7 @@
 ## 0.0.5
 
 * 增加FfmpegUtil.setupFromAsset方法
+
+## 0.0.6
+
+* 完善播放器状态处理

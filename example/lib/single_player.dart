@@ -18,6 +18,11 @@ class _SinglePlayerPageState extends State<SinglePlayerPage> {
   @override
   void initState() {
     super.initState();
+    playerController.status.addListener(
+      () {
+        print(playerController.status.value.name);
+      },
+    );
     playerController.play(
       'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
       onProgress: (pos) {
@@ -138,7 +143,7 @@ class _SinglePlayerPageState extends State<SinglePlayerPage> {
       floatingActionButton: ValueListenableBuilder(
         valueListenable: playerController.status,
         builder: (context, status, child) {
-          if ([PlayerStatus.playing, PlayerStatus.pausing].contains(status)) {
+          if ([PlayerStatus.playing, PlayerStatus.paused].contains(status)) {
             var playing = status == PlayerStatus.playing;
             return FloatingActionButton(
               onPressed: () {
