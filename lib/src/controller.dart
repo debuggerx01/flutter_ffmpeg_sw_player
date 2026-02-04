@@ -19,6 +19,11 @@ enum PlayerStatus {
 }
 
 class FfmpegPlayerController {
+  /// 当所属的[FfmpegPlayerView]销毁时自动释放持有的资源
+  bool autoDispose;
+
+  FfmpegPlayerController({this.autoDispose = true});
+
   final ValueNotifier<PlayerStatus> status = ValueNotifier(PlayerStatus.idle);
   final FpsTicker _fpsTicker = FpsTicker();
   MediaInfo? _mediaInfo;

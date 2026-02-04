@@ -104,7 +104,9 @@ class _FfmpegPlayerViewState extends State<FfmpegPlayerView> {
     if (widget.useTextureRender) {
       _textureRgbaRendererPlugin.closeTexture(_key);
     }
-    widget.controller.dispose();
+    if (widget.controller.autoDispose) {
+      widget.controller.dispose();
+    }
   }
 
   @override

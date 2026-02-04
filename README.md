@@ -101,6 +101,9 @@ void dispose() {
 | status                              | ValueNotifier\<PlayerStatus\> 监听播放器状态 (idle, loading, playing, pausing, error) |
 | dispose()                           | 释放资源，关闭 FFmpeg 进程                                                              |
 
+> 为防止不再使用播放器时，由于忘记调用控制器的 dispose 方法导致后台 ffmpeg 进程持续解码占用资源，默认情况下 `FfmpegPlayerView` 销毁时会自动调用控制器的 dispose 方法。如果确实需要页面内临时移除 `FfmpegPlayerView` 但不销毁控制器，请使用 `FfmpegPlayerController(autoDispose: true)` 构造或手动将 `autoDispose` 属性设置为 `false`，并确保在页面销毁时调用 `controller.dispose()`。
+
+
 ## 🤝 贡献与反馈
 
 如果您在使用过程中遇到问题，或者有更好的改进建议，欢迎提交 Issue 或 Pull Request。
