@@ -171,6 +171,14 @@ class FfmpegPlayerController {
           if (_dataReceiver?.isPaused == true) {
             _dataReceiver?.resume();
           }
+          if (_reachEnd) {
+            onComplete?.call();
+            _fpsTicker.stop();
+            status.value = PlayerStatus.idle;
+            if (loop) {
+              _play(playKey, path, onProgress: onProgress, onComplete: onComplete, loop: loop, fromLoop: true);
+            }
+          }
           return;
         }
 
@@ -223,14 +231,7 @@ class FfmpegPlayerController {
           _fpsTicker.stop();
           status.value = PlayerStatus.idle;
           if (loop) {
-            _play(
-              playKey,
-              path,
-              onProgress: onProgress,
-              onComplete: onComplete,
-              loop: loop,
-              fromLoop: true,
-            );
+            _play(playKey, path, onProgress: onProgress, onComplete: onComplete, loop: loop, fromLoop: true);
           }
         }
       },

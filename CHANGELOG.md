@@ -1,3 +1,7 @@
+## 0.0.8
+
+* 修复偶现视频播放完成时卡住的问题
+
 ## 0.0.7
 
 * 增加 FfmpegPlayerController.autoDispose 属性
