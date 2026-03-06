@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
@@ -8,6 +9,15 @@ import 'package:path_provider/path_provider.dart';
 import 'media_info.dart';
 
 String? _ffmpegBinaryPath;
+
+extension LimitedQueue<E> on ListQueue<E> {
+  void addLimit(E element, int limit) {
+    if (length >= limit) {
+      removeFirst();
+    }
+    addLast(element);
+  }
+}
 
 class FfmpegUtil {
   static Future setupFromAsset(String assetsKey, [bool forceUpdate = false]) async {
@@ -85,14 +95,27 @@ class FfmpegUtil {
 
   static Future<(int, StreamSubscription<List<int>>)> playFile(
     String path, {
+    required bool isLive,
     required void Function(List<int> chunk) onData,
     required void Function(String line)? onInfo,
+    required void Function(int code, List<String> info)? onError,
     bool needMediaInfoLogs = true,
   }) {
     return Process.start(
       _ffmpegBinaryPath ?? (Platform.isWindows ? 'ffmpeg.exe' : 'ffmpeg'),
       [
         '-i', path,
+        if (isLive) ...[
+          '-fflags',
+          'nobuffer',
+          '-flags',
+          'low_delay',
+          '-preset',
+          'ultrafast',
+          '-tune',
+          'zerolatency',
+        ],
+
         '-an',
         // 关键参数：把进度信息以 key=value 格式写到 stderr (pipe:2)
         '-progress', 'pipe:2',
@@ -105,9 +128,20 @@ class FfmpegUtil {
     ).then(
       (p) {
         var streamSubscription = p.stdout.listen(onData);
+        var lastInfo = ListQueue<String>(30);
         p.stderr.transform(utf8.decoder).transform(const LineSplitter()).listen(
           (event) {
             onInfo?.call(event);
+            if (onError != null) {
+              lastInfo.addLimit(event, 30);
+            }
+          },
+        );
+        p.exitCode.then(
+          (code) {
+            if (code < 0 && onError != null) {
+              onError.call(code, lastInfo.toList(growable: false));
+            }
           },
         );
         return (p.pid, streamSubscription);

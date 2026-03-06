@@ -5,12 +5,18 @@ class FpsTicker {
   Ticker? _ticker;
 
   void start({
+    // 如果是 0 则表示不限制帧率，可以用于直播流
     required double fps,
     required void Function(int frameCount) onTick,
   }) {
     stop();
     _ticker = Ticker(
       (elapsed) {
+        if (fps <= 0) {
+          onTick(_frameCount);
+          _frameCount++;
+          return;
+        }
         if (elapsed.inMilliseconds > _frameCount * (1000 / fps)) {
           onTick(_frameCount);
           _frameCount++;

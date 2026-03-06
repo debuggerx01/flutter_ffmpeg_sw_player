@@ -111,23 +111,30 @@ class _FfmpegPlayerViewState extends State<FfmpegPlayerView> {
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.useTextureRender) {
-      return RawImage(
-        fit: widget.fit,
-        image: frameImage,
-      );
-    }
-    return _textureId == null
-        ? const SizedBox.shrink()
-        : FittedBox(
-            fit: widget.fit,
-            child: SizedBox.fromSize(
-              size: size,
-              child: Texture(
-                textureId: _textureId!,
-                filterQuality: FilterQuality.none,
-              ),
-            ),
-          );
+    return ValueListenableBuilder(
+      valueListenable: widget.controller.status,
+      builder: (context, status, child) {
+        return Visibility.maintain(
+          visible: [PlayerStatus.playing, PlayerStatus.paused].contains(status),
+          child: widget.useTextureRender
+              ? (_textureId == null
+                  ? const SizedBox.shrink()
+                  : FittedBox(
+                      fit: widget.fit,
+                      child: SizedBox.fromSize(
+                        size: size,
+                        child: Texture(
+                          textureId: _textureId!,
+                          filterQuality: FilterQuality.none,
+                        ),
+                      ),
+                    ))
+              : RawImage(
+                  fit: widget.fit,
+                  image: frameImage,
+                ),
+        );
+      },
+    );
   }
 }

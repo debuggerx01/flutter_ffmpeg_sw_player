@@ -23,6 +23,10 @@ class _SinglePlayerPageState extends State<SinglePlayerPage> {
         print(playerController.status.value.name);
       },
     );
+    _play();
+  }
+
+  void _play() {
     playerController.play(
       'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
       onProgress: (pos) {
@@ -31,6 +35,12 @@ class _SinglePlayerPageState extends State<SinglePlayerPage> {
             this.pos = pos;
           });
         }
+      },
+      // 播放异常停止时，打印信息，并自动重播
+      onError: (code, info) {
+        print(code);
+        print(info);
+        _play();
       },
     ).then(
       (value) {

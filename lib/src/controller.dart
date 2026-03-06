@@ -18,6 +18,8 @@ enum PlayerStatus {
   error,
 }
 
+const liveSchemas = ['rtmp', 'rtmps' 'rtsp', 'rtsps', 'srt'];
+
 class FfmpegPlayerController {
   /// 当所属的[FfmpegPlayerView]销毁时自动释放持有的资源
   bool autoDispose;
@@ -54,7 +56,9 @@ class FfmpegPlayerController {
     String path, {
     void Function(Duration pos)? onProgress,
     void Function()? onComplete,
+    void Function(int code, List<String> info)? onError,
     bool loop = true,
+    bool? isLive,
   }) {
     _currentPlayKey = DateTime.now().microsecondsSinceEpoch;
     return _play(
@@ -62,7 +66,9 @@ class FfmpegPlayerController {
       path,
       onProgress: onProgress,
       onComplete: onComplete,
+      onError: onError,
       loop: loop,
+      isLive: isLive,
       fromLoop: false,
     );
   }
@@ -72,8 +78,10 @@ class FfmpegPlayerController {
     String path, {
     void Function(Duration pos)? onProgress,
     void Function()? onComplete,
+    void Function(int code, List<String> info)? onError,
     required bool fromLoop,
     required bool loop,
+    bool? isLive,
   }) {
     Completer<MediaInfo?> completer = Completer();
     var logs = <String>[];
@@ -84,9 +92,15 @@ class FfmpegPlayerController {
     }
     status.value = PlayerStatus.loading;
     _reachEnd = false;
+    isLive ??= liveSchemas.contains(Uri.tryParse(path)?.scheme);
     FfmpegUtil.playFile(
       path,
       needMediaInfoLogs: !fromLoop,
+      isLive: isLive,
+      onError: (code, info) {
+        status.value = PlayerStatus.error;
+        onError?.call(code, info);
+      },
       onData: (chunk) {
         if (playKey != _currentPlayKey) return;
         _chunkQueue.add(chunk);
@@ -143,8 +157,10 @@ class FfmpegPlayerController {
           playKey,
           path,
           loop,
+          isLive!,
           onProgress,
           onComplete,
+          onError,
         );
       }
       return mediaInfo;
@@ -155,11 +171,13 @@ class FfmpegPlayerController {
     int playKey,
     String path,
     bool loop,
+    bool isLive,
     void Function(Duration pos)? onProgress,
     void Function()? onComplete,
+    void Function(int code, List<String> info)? onError,
   ) {
     _fpsTicker.start(
-      fps: _mediaInfo!.fps,
+      fps: isLive ? 0 : _mediaInfo!.fps,
       onTick: (frameCount) {
         if (playKey != _currentPlayKey) return;
         if (_nativeBuffer == null) return;
@@ -176,7 +194,7 @@ class FfmpegPlayerController {
             _fpsTicker.stop();
             status.value = PlayerStatus.idle;
             if (loop) {
-              _play(playKey, path, onProgress: onProgress, onComplete: onComplete, loop: loop, fromLoop: true);
+              _play(playKey, path, onProgress: onProgress, onComplete: onComplete, onError: onError, loop: loop, fromLoop: true);
             }
           }
           return;
@@ -231,7 +249,7 @@ class FfmpegPlayerController {
           _fpsTicker.stop();
           status.value = PlayerStatus.idle;
           if (loop) {
-            _play(playKey, path, onProgress: onProgress, onComplete: onComplete, loop: loop, fromLoop: true);
+            _play(playKey, path, onProgress: onProgress, onComplete: onComplete, onError: onError, loop: loop, fromLoop: true);
           }
         }
       },
