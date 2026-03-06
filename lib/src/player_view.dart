@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ffi';
 import 'dart:ui' as ui;
 
@@ -28,6 +29,9 @@ class _FfmpegPlayerViewState extends State<FfmpegPlayerView> {
   int? _texturePtr;
   ui.Image? frameImage;
   ui.Size size = ui.Size.zero;
+
+  Timer? blackScreenTimer;
+  bool _showBlackScreen = false;
 
   @override
   void initState() {
@@ -96,6 +100,29 @@ class _FfmpegPlayerViewState extends State<FfmpegPlayerView> {
         },
       );
     }
+
+    widget.controller.status.addListener(_handlePlayStatus);
+  }
+
+  void _handlePlayStatus() {
+    if (blackScreenTimer?.isActive == true) {
+      blackScreenTimer?.cancel();
+    }
+    if ([PlayerStatus.idle, PlayerStatus.error].contains(widget.controller.status.value)) {
+      blackScreenTimer = Timer(const Duration(milliseconds: 100), () {
+        __showBackScreen(true);
+      });
+    } else {
+      __showBackScreen(false);
+    }
+  }
+
+  void __showBackScreen(bool show) {
+    if (_showBlackScreen != show && mounted) {
+      setState(() {
+        _showBlackScreen = show;
+      });
+    }
   }
 
   @override
@@ -107,6 +134,7 @@ class _FfmpegPlayerViewState extends State<FfmpegPlayerView> {
     if (widget.controller.autoDispose) {
       widget.controller.dispose();
     }
+    widget.controller.status.removeListener(_handlePlayStatus);
   }
 
   @override
@@ -115,7 +143,7 @@ class _FfmpegPlayerViewState extends State<FfmpegPlayerView> {
       valueListenable: widget.controller.status,
       builder: (context, status, child) {
         return Visibility.maintain(
-          visible: [PlayerStatus.playing, PlayerStatus.paused].contains(status),
+          visible: !_showBlackScreen,
           child: widget.useTextureRender
               ? (_textureId == null
                   ? const SizedBox.shrink()
