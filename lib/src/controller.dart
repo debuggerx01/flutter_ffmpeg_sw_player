@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:ffi';
-import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter/material.dart';
@@ -42,7 +41,7 @@ class FfmpegPlayerController {
   /// 当前第一个 chunk 用到了哪里
   int _chunkOffset = 0;
 
-  int? _currentFfmpegPid;
+  Function? _currentFfmpegProcessKiller;
 
   int get _currentBufferSize => (_mediaInfo?.width ?? 0) * (_mediaInfo?.height ?? 0) * 4;
 
@@ -143,10 +142,9 @@ class FfmpegPlayerController {
     ).then(
       (res) {
         if (playKey != _currentPlayKey) {
-          Process.killPid(res.$1);
           return;
         }
-        _currentFfmpegPid = res.$1;
+        _currentFfmpegProcessKiller = res.$1;
         _dataReceiver = res.$2;
       },
     );
@@ -178,7 +176,7 @@ class FfmpegPlayerController {
   ) {
     _fpsTicker.start(
       fps: isLive ? 0 : _mediaInfo!.fps,
-      onTick: (frameCount) {
+      onTick: (frameCount, skipThisFrame) {
         if (playKey != _currentPlayKey) return;
         if (_nativeBuffer == null) return;
 
@@ -237,7 +235,9 @@ class FfmpegPlayerController {
         _totalBufferedBytes -= _currentBufferSize;
 
         // --- 渲染 ---
-        _onFrame?.call(_nativeBuffer!, _mediaInfo!.width, _mediaInfo!.height);
+        if (!skipThisFrame) {
+          _onFrame?.call(_nativeBuffer!, _mediaInfo!.width, _mediaInfo!.height);
+        }
 
         // 【背压恢复】如果水位降到了 1 帧以内，恢复接收
         if (_dataReceiver?.isPaused == true && _totalBufferedBytes < _currentBufferSize * cacheFrames) {
@@ -266,9 +266,8 @@ class FfmpegPlayerController {
   }
 
   void dispose() {
-    if (_currentFfmpegPid != null) {
-      Process.killPid(_currentFfmpegPid!);
-    }
+    _currentFfmpegProcessKiller?.call();
+    _currentFfmpegProcessKiller = null;
 
     if (_nativeBuffer != null) {
       malloc.free(_nativeBuffer!);

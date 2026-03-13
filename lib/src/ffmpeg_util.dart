@@ -93,7 +93,7 @@ class FfmpegUtil {
     return FfmpegUtil.fetchMediaInfoFromLogs(result.stderr.toString().split('\n'));
   }
 
-  static Future<(int, StreamSubscription<List<int>>)> playFile(
+  static Future<(Function, StreamSubscription<List<int>>)> playFile(
     String path, {
     required bool isLive,
     required void Function(List<int> chunk) onData,
@@ -127,6 +127,7 @@ class FfmpegUtil {
       ],
     ).then(
       (p) {
+        var killedByStop = false;
         var streamSubscription = p.stdout.listen(onData);
         var lastInfo = ListQueue<String>(30);
         p.stderr.transform(utf8.decoder).transform(const LineSplitter()).listen(
@@ -139,12 +140,18 @@ class FfmpegUtil {
         );
         p.exitCode.then(
           (code) {
-            if (code < 0 && onError != null) {
+            if (!killedByStop && code != 0 && onError != null) {
               onError.call(code, lastInfo.toList(growable: false));
             }
           },
         );
-        return (p.pid, streamSubscription);
+        return (
+          () {
+            killedByStop = true;
+            p.kill();
+          },
+          streamSubscription,
+        );
       },
     );
   }
