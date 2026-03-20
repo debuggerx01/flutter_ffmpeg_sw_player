@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:ffi';
+import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter/material.dart';
@@ -17,7 +19,7 @@ enum PlayerStatus {
   error,
 }
 
-const liveSchemas = ['rtmp', 'rtmps' 'rtsp', 'rtsps', 'srt'];
+const liveSchemas = ['rtmp', 'rtmps', 'rtsp', 'rtsps', 'srt'];
 
 class FfmpegPlayerController {
   /// 当所属的[FfmpegPlayerView]销毁时自动释放持有的资源
@@ -33,7 +35,7 @@ class FfmpegPlayerController {
   Pointer<Uint8>? _nativeBuffer;
 
   /// 数据包缓冲区
-  final List<List<int>> _chunkQueue = [];
+  final Queue<Uint8List> _chunkQueue = Queue();
 
   /// 当前数据包缓冲区的总数据长度
   int _totalBufferedBytes = 0;
@@ -86,6 +88,11 @@ class FfmpegPlayerController {
     var logs = <String>[];
     if (fromLoop) {
       completer.complete(_mediaInfo);
+      _currentFfmpegProcessKiller?.call();
+      _dataReceiver?.cancel();
+      _chunkQueue.clear();
+      _chunkOffset = 0;
+      _totalBufferedBytes = 0;
     } else {
       stop();
     }
@@ -102,7 +109,7 @@ class FfmpegPlayerController {
       },
       onData: (chunk) {
         if (playKey != _currentPlayKey) return;
-        _chunkQueue.add(chunk);
+        _chunkQueue.add(chunk is Uint8List ? chunk : Uint8List.fromList(chunk));
         _totalBufferedBytes += chunk.length;
         if (_currentBufferSize != 0 && _dataReceiver != null && _totalBufferedBytes > _currentBufferSize * cacheFrames) {
           /// 如果缓冲区的已有超过[cacheFrames]帧数据，就可以先暂停接收了
@@ -226,7 +233,7 @@ class FfmpegPlayerController {
 
           // 如果当前 chunk 用完了，移除它
           if (_chunkOffset >= currentChunk.length) {
-            _chunkQueue.removeAt(0); // 移除第一个
+            _chunkQueue.removeFirst(); // 移除第一个
             _chunkOffset = 0; // 重置偏移量
           }
         }
@@ -242,15 +249,6 @@ class FfmpegPlayerController {
         // 【背压恢复】如果水位降到了 1 帧以内，恢复接收
         if (_dataReceiver?.isPaused == true && _totalBufferedBytes < _currentBufferSize * cacheFrames) {
           _dataReceiver?.resume();
-        }
-
-        if (_reachEnd && _totalBufferedBytes == 0) {
-          onComplete?.call();
-          _fpsTicker.stop();
-          status.value = PlayerStatus.idle;
-          if (loop) {
-            _play(playKey, path, onProgress: onProgress, onComplete: onComplete, onError: onError, loop: loop, fromLoop: true);
-          }
         }
       },
     );

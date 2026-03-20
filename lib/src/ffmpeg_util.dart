@@ -20,20 +20,23 @@ extension LimitedQueue<E> on ListQueue<E> {
 }
 
 class FfmpegUtil {
-  static Future setupFromAsset(String assetsKey, [bool forceUpdate = false]) async {
+  static final RegExp _durationRegex = RegExp(r' ([0-9]+:[0-9]+:[0-9]+\.[0-9]+),');
+  static final RegExp _videoStreamRegex = RegExp(r' ([0-9]+x[0-9]+)[, ].+? ([0-9]+(?:\.[0-9]+)?)\s+fps');
+
+  static Future<void> setupFromAsset(String assetsKey, [bool forceUpdate = false]) async {
     var directory = await getApplicationSupportDirectory();
     _ffmpegBinaryPath = '${directory.path}/3rd_party/ffmpeg';
     var ffmpegBinaryFile = File(_ffmpegBinaryPath!);
     if (ffmpegBinaryFile.existsSync() && !forceUpdate) {
       return;
     }
-    rootBundle.load(assetsKey).then((data) async {
-      if (!ffmpegBinaryFile.existsSync()) {
-        ffmpegBinaryFile.createSync(recursive: true);
-        ffmpegBinaryFile.writeAsBytesSync(data.buffer.asUint8List());
-        setBinaryPath(ffmpegBinaryFile.path);
-      }
-    });
+
+    final data = await rootBundle.load(assetsKey);
+    if (!ffmpegBinaryFile.existsSync()) {
+      await ffmpegBinaryFile.create(recursive: true);
+      await ffmpegBinaryFile.writeAsBytes(data.buffer.asUint8List());
+      setBinaryPath(ffmpegBinaryFile.path);
+    }
   }
 
   static bool setBinaryPath(String path) {
@@ -51,19 +54,19 @@ class FfmpegUtil {
   }
 
   static MediaInfo? fetchMediaInfoFromLogs(List<String> logs) {
-    String? durationStr = '';
+    String? durationStr;
     int? width;
     int? height;
     double? fps;
+
     for (var line in logs) {
-      if (!line.startsWith('  Duration:') && !line.startsWith('  Stream')) continue;
       if (line.startsWith('  Duration:')) {
-        var firstMatch = RegExp(r' ([0-9]+:[0-9]+:[0-9]+\.[0-9]+),').firstMatch(line);
+        var firstMatch = _durationRegex.firstMatch(line);
         if (firstMatch != null && firstMatch.groupCount > 0) {
           durationStr = firstMatch.group(1);
         }
       } else if (line.contains('Stream') && line.contains('Video:')) {
-        var firstMatch = RegExp(r' ([0-9]+x[0-9]+)[, ].+ ([0-9]+\.?[0-9]+?) fps,').firstMatch(line);
+        var firstMatch = _videoStreamRegex.firstMatch(line);
         if (firstMatch != null && firstMatch.groupCount > 1) {
           var parts = firstMatch.group(1)!.split('x');
           width = int.tryParse(parts.first);
@@ -83,8 +86,8 @@ class FfmpegUtil {
     );
   }
 
-  static MediaInfo? getMediaInfo(String path) {
-    var result = Process.runSync(
+  static Future<MediaInfo?> getMediaInfo(String path) async {
+    var result = await Process.run(
       _ffmpegBinaryPath ?? (Platform.isWindows ? 'ffmpeg.exe' : 'ffmpeg'),
       ['-i', path],
       runInShell: true,
@@ -104,7 +107,8 @@ class FfmpegUtil {
     return Process.start(
       _ffmpegBinaryPath ?? (Platform.isWindows ? 'ffmpeg.exe' : 'ffmpeg'),
       [
-        '-i', path,
+        '-i',
+        path,
         if (isLive) ...[
           '-fflags',
           'nobuffer',
@@ -115,14 +119,15 @@ class FfmpegUtil {
           '-tune',
           'zerolatency',
         ],
-
         '-an',
-        // 关键参数：把进度信息以 key=value 格式写到 stderr (pipe:2)
-        '-progress', 'pipe:2',
-        '-f', 'rawvideo',
-        '-pix_fmt', 'bgra',
-        // loglevel error 可以减少不必要的日志，但 -progress 的输出依然会被打印
-        '-loglevel', needMediaInfoLogs ? 'info' : 'error',
+        '-progress',
+        'pipe:2',
+        '-f',
+        'rawvideo',
+        '-pix_fmt',
+        'bgra',
+        '-loglevel',
+        needMediaInfoLogs ? 'info' : 'error',
         '-',
       ],
     ).then(
@@ -130,7 +135,8 @@ class FfmpegUtil {
         var killedByStop = false;
         var streamSubscription = p.stdout.listen(onData);
         var lastInfo = ListQueue<String>(30);
-        p.stderr.transform(utf8.decoder).transform(const LineSplitter()).listen(
+
+        p.stderr.transform(const Utf8Decoder(allowMalformed: true)).transform(const LineSplitter()).listen(
           (event) {
             onInfo?.call(event);
             if (onError != null) {
@@ -138,6 +144,7 @@ class FfmpegUtil {
             }
           },
         );
+
         p.exitCode.then(
           (code) {
             if (!killedByStop && code != 0 && onError != null) {
@@ -145,6 +152,7 @@ class FfmpegUtil {
             }
           },
         );
+
         return (
           () {
             killedByStop = true;
