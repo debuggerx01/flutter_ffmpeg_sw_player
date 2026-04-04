@@ -103,11 +103,11 @@ class FfmpegUtil {
     required void Function(String line)? onInfo,
     required void Function(int code, List<String> info)? onError,
     bool needMediaInfoLogs = true,
-    List<String> Function(String path)? commandBuilder,
+    List<String> Function(String path, bool needMediaInfoLogs, bool isLive)? commandBuilder,
   }) {
     return Process.start(
       _ffmpegBinaryPath ?? (Platform.isWindows ? 'ffmpeg.exe' : 'ffmpeg'),
-      commandBuilder?.call(path) ??
+      commandBuilder?.call(path, needMediaInfoLogs, isLive) ??
           [
             '-i',
             path,

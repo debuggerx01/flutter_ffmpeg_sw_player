@@ -60,7 +60,7 @@ class FfmpegPlayerController {
     void Function(int code, List<String> info)? onError,
     bool loop = true,
     bool? isLive,
-    List<String> Function(String path)? commandBuilder,
+    List<String> Function(String path, bool needMediaInfoLogs, bool isLive)? commandBuilder,
   }) {
     _currentPlayKey = DateTime.now().microsecondsSinceEpoch;
     return _play(
@@ -85,7 +85,7 @@ class FfmpegPlayerController {
     required bool fromLoop,
     required bool loop,
     bool? isLive,
-    List<String> Function(String path)? commandBuilder,
+    List<String> Function(String path, bool needMediaInfoLogs, bool isLive)? commandBuilder,
   }) {
     Completer<MediaInfo?> completer = Completer();
     var logs = <String>[];
