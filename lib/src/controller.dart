@@ -170,6 +170,7 @@ class FfmpegPlayerController {
           onProgress,
           onComplete,
           onError,
+          commandBuilder,
         );
       }
       return mediaInfo;
@@ -184,6 +185,7 @@ class FfmpegPlayerController {
     void Function(Duration pos)? onProgress,
     void Function()? onComplete,
     void Function(int code, List<String> info)? onError,
+    List<String> Function(String path, bool needMediaInfoLogs, bool isLive)? commandBuilder,
   ) {
     _fpsTicker.start(
       fps: isLive ? 0 : _mediaInfo!.fps,
@@ -203,7 +205,16 @@ class FfmpegPlayerController {
             _fpsTicker.stop();
             status.value = PlayerStatus.idle;
             if (loop) {
-              _play(playKey, path, onProgress: onProgress, onComplete: onComplete, onError: onError, loop: loop, fromLoop: true);
+              _play(
+                playKey,
+                path,
+                onProgress: onProgress,
+                onComplete: onComplete,
+                onError: onError,
+                loop: loop,
+                fromLoop: true,
+                commandBuilder: commandBuilder,
+              );
             }
           }
           return;
