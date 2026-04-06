@@ -25,7 +25,7 @@ class FpsTicker {
     final double frameDurationUs = fps > 0 ? 1000000 / fps : 0;
 
     _ticker = Ticker(
-          (elapsed) {
+      (elapsed) {
         final int deltaUs = (elapsed - _lastElapsed).inMicroseconds;
         _lastElapsed = elapsed;
 
@@ -41,7 +41,7 @@ class FpsTicker {
         }
 
         // 使用累加的微秒时间和预计算的单帧耗时进行判断
-        while (_accumulatedMicroseconds > _frameCount * frameDurationUs) {
+        while (_accumulatedMicroseconds >= _frameCount * frameDurationUs) {
           bool skipThisFrame = _accumulatedMicroseconds > (_frameCount + 1) * frameDurationUs;
           onTick(_frameCount, skipThisFrame);
           _frameCount++;

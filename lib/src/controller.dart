@@ -33,6 +33,8 @@ class FfmpegPlayerController {
   void Function(Pointer<Uint8> frameDataPtr, int width, int height)? _onFrame;
 
   Pointer<Uint8>? _nativeBuffer;
+  // 收纳一帧 YUV 数据的临时 Dart Buffer
+  Uint8List? _yuvDartBuffer;
 
   /// 数据包缓冲区
   final Queue<Uint8List> _chunkQueue = Queue();
@@ -45,7 +47,11 @@ class FfmpegPlayerController {
 
   Function? _currentFfmpegProcessKiller;
 
-  int get _currentBufferSize => (_mediaInfo?.width ?? 0) * (_mediaInfo?.height ?? 0) * 4;
+  // 渲染时使用的 BGRA 大小
+  int get _bgraFrameSize => (_mediaInfo?.width ?? 0) * (_mediaInfo?.height ?? 0) * 4;
+
+  // 管道传入的 YUV420P 大小
+  int get _yuvFrameSize => ((_mediaInfo?.width ?? 0) * (_mediaInfo?.height ?? 0) * 3) ~/ 2;
 
   StreamSubscription<List<int>>? _dataReceiver;
 
@@ -115,8 +121,8 @@ class FfmpegPlayerController {
         if (playKey != _currentPlayKey) return;
         _chunkQueue.add(chunk is Uint8List ? chunk : Uint8List.fromList(chunk));
         _totalBufferedBytes += chunk.length;
-        if (_currentBufferSize != 0 && _dataReceiver != null && _totalBufferedBytes > _currentBufferSize * cacheFrames) {
-          /// 如果缓冲区的已有超过[cacheFrames]帧数据，就可以先暂停接收了
+        if (_yuvFrameSize != 0 && _dataReceiver != null && _totalBufferedBytes > _yuvFrameSize * cacheFrames) {
+          /// 如果缓冲区的已有超过[cacheFrames]帧 YUV 数据，就可以先暂停接收了
           _dataReceiver?.pause();
         }
       },
@@ -129,7 +135,8 @@ class FfmpegPlayerController {
             if (_mediaInfo == null) {
               stop(true);
             } else {
-              _nativeBuffer = malloc.allocate(_currentBufferSize);
+              _nativeBuffer = malloc.allocate(_bgraFrameSize);
+              _yuvDartBuffer = Uint8List(_yuvFrameSize);
             }
             if (!completer.isCompleted) {
               completer.complete(_mediaInfo);
@@ -191,11 +198,10 @@ class FfmpegPlayerController {
       fps: isLive ? 0 : _mediaInfo!.fps,
       onTick: (frameCount, skipThisFrame) {
         if (playKey != _currentPlayKey) return;
-        if (_nativeBuffer == null) return;
+        if (_nativeBuffer == null || _yuvDartBuffer == null) return;
 
-        // print('[$frameCount]\t$currentTime\t${_totalBufferedBytes < _currentBufferSize}\t${_nativeBuffer == null}');
-        // 如果数据不够一帧，直接跳过，等待下一次 tick
-        if (_totalBufferedBytes < _currentBufferSize) {
+        // 如果数据不够一帧 YUV，直接跳过，等待下一次 tick
+        if (_totalBufferedBytes < _yuvFrameSize) {
           // 如果之前暂停了，现在数据不够了，赶紧恢复
           if (_dataReceiver?.isPaused == true) {
             _dataReceiver?.resume();
@@ -224,10 +230,10 @@ class FfmpegPlayerController {
           status.value = PlayerStatus.playing;
         }
 
-        // --- 开始拼凑一帧数据 ---
+        // --- 开始拼凑一帧 YUV 数据 ---
         int bytesFilled = 0;
 
-        while (bytesFilled < _currentBufferSize) {
+        while (bytesFilled < _yuvFrameSize) {
           if (_chunkQueue.isEmpty) break; // 防御性检查
 
           final currentChunk = _chunkQueue.first;
@@ -235,13 +241,13 @@ class FfmpegPlayerController {
           // 当前 chunk 剩余可用长度
           int availableInChunk = currentChunk.length - _chunkOffset;
           // 还需要填充多少
-          int needed = _currentBufferSize - bytesFilled;
+          int needed = _yuvFrameSize - bytesFilled;
 
           // 决定拷贝多少
           int toCopy = availableInChunk < needed ? availableInChunk : needed;
 
-          // 拷贝数据到 Native 内存
-          _nativeBuffer!.asTypedList(_currentBufferSize).setRange(bytesFilled, bytesFilled + toCopy, currentChunk, _chunkOffset);
+          // 使用暂存区承载 YUV
+          _yuvDartBuffer!.setRange(bytesFilled, bytesFilled + toCopy, currentChunk, _chunkOffset);
 
           bytesFilled += toCopy;
           _chunkOffset += toCopy;
@@ -253,20 +259,62 @@ class FfmpegPlayerController {
           }
         }
 
-        // 更新总缓冲计数
-        _totalBufferedBytes -= _currentBufferSize;
+        // 更新总缓冲计数 (减去 YUV 的大小)
+        _totalBufferedBytes -= _yuvFrameSize;
 
         // --- 渲染 ---
         if (!skipThisFrame) {
+          // 利用高效 Dart 查找表进行软转并写入 Native 的 RGBA buffer
+          _convertYuv420pToBgra(_yuvDartBuffer!, _nativeBuffer!, _mediaInfo!.width, _mediaInfo!.height);
           _onFrame?.call(_nativeBuffer!, _mediaInfo!.width, _mediaInfo!.height);
         }
 
         // 【背压恢复】如果水位降到了 1 帧以内，恢复接收
-        if (_dataReceiver?.isPaused == true && _totalBufferedBytes < _currentBufferSize * cacheFrames) {
+        if (_dataReceiver?.isPaused == true && _totalBufferedBytes < _yuvFrameSize * cacheFrames) {
           _dataReceiver?.resume();
         }
       },
     );
+  }
+
+  /// 高性能 Native 内存零拷贝视角的转换方法
+  static void _convertYuv420pToBgra(Uint8List yuv, Pointer<Uint8> bgraPtr, int width, int height) {
+    final int size = width * height;
+    // 直接映射为 4字节(32位)整型数组，大幅降低写入次数
+    final Uint32List bgra = bgraPtr.cast<Uint32>().asTypedList(size);
+
+    int outIdx = 0;
+    int yIdx = 0;
+    final int uOffset = size;
+    final int vOffset = size + (size >> 2); // size + size/4
+
+    for (int j = 0; j < height; j++) {
+      int uvpJ = j >> 1;
+      int uvIdx = uvpJ * (width >> 1);
+
+      for (int i = 0; i < width; i++) {
+        int uvpI = i >> 1;
+        int y = yuv[yIdx++];
+        int u = yuv[uOffset + uvIdx + uvpI] - 128;
+        int v = yuv[vOffset + uvIdx + uvpI] - 128;
+
+        // 经典 YUV to RGB 整数转换算法
+        int y1192 = 1192 * (y - 16);
+        if (y1192 < 0) y1192 = 0;
+
+        int r = y1192 + 1634 * v;
+        int g = y1192 - 833 * v - 400 * u;
+        int b = y1192 + 2066 * u;
+
+        r = r < 0 ? 0 : (r > 262143 ? 262143 : r);
+        g = g < 0 ? 0 : (g > 262143 ? 262143 : g);
+        b = b < 0 ? 0 : (b > 262143 ? 262143 : b);
+
+        // 小端序平台中 Uint32 [Byte0, Byte1, Byte2, Byte3] 的内存布局恰好等于低位到高位
+        // BGRA 要求在内存中顺序为: B(byte0), G(byte1), R(byte2), A_255(byte3)
+        bgra[outIdx++] = 0xFF000000 | ((r >> 10) << 16) | ((g >> 10) << 8) | (b >> 10);
+      }
+    }
   }
 
   void stop([bool error = false]) {
@@ -286,6 +334,8 @@ class FfmpegPlayerController {
       malloc.free(_nativeBuffer!);
       _nativeBuffer = null;
     }
+
+    _yuvDartBuffer = null;
 
     _dataReceiver?.cancel();
     _fpsTicker.stop();
