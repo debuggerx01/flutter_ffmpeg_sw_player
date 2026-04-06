@@ -1,3 +1,4 @@
+import 'package:example/performance_tester.dart';
 import 'package:example/playlist.dart';
 import 'package:example/multi_player.dart';
 import 'package:example/single_player.dart';
@@ -64,6 +65,18 @@ class HomePage extends StatelessWidget {
                 );
               },
               child: Text('PlayList'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => PerformanceTester(
+                      testMediaUrl: '/path/to/test.mp4',
+                    ),
+                  ),
+                );
+              },
+              child: Text('Performance'),
             ),
           ],
         ),
